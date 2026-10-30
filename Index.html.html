@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Attendance & Shift Management System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* CSS Print Stylesheet for Staff-wise PDF Generation */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+                font-size: 11pt;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .print-card {
+                box-shadow: none !important;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 0 !important;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            th, td {
+                border: 1px solid #94a3b8 !important;
+                padding: 6px 8px !important;
+                text-align: left !important;
+            }
+            th {
+                background-color: #f1f5f9 !important;
+                color: #0f172a !important;
+            }
+        }
+        .print-only {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- LOGIN SCREEN MODAL / OVERLAY -->
+    <div id="loginModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden">
+            <div class="bg-gradient-to-r from-brand-700 to-brand-900 text-white p-6 text-center relative">
+                <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-white/20 shadow-inner">
+                    <i class="fa-solid fa-id-card-clip text-3xl text-brand-100"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold tracking-tight">Staff Login Portal</h2>
+                <p class="text-xs text-brand-100 mt-1">Attendance & Shift Schedule System</p>
+            </div>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">User ID</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3 top-3 text-slate-400 text-sm"></i>
+                        <input type="text" id="loginUserId" required placeholder="Enter User ID" class="w-full text-sm pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Password</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3 top-3 text-slate-400 text-sm"></i>
+                        <input type="password" id="loginPassword" required placeholder="Enter password" class="w-full text-sm pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition">
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-200 flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                        <span>Login</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div id="appContainer" class="hidden flex-col min-h-screen">
+
+        <!-- HEADER NAVIGATION -->
+        <header class="bg-slate-900 text-white shadow-lg no-print sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-brand-600 text-white p-2.5 rounded-xl shadow-md">
+                        <i class="fa-solid fa-business-time text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-extrabold tracking-tight flex items-center gap-2">
+                            <span>Staff Attendance Portal</span>
+                            <span id="adminBadge" class="hidden bg-purple-600 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">Admin View</span>
+                        </h1>
+                        <p class="text-xs text-slate-400" id="currentStaffShiftDisplay">Shift: General (09:00 AM - 05:00 PM)</p>
+                    </div>
+                </div>
+
+                <!-- Logged in status & SEPARATED Punch/Logout buttons -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <div class="text-right hidden sm:block pr-2 border-r border-slate-700">
+                        <p class="text-[10px] text-slate-400 uppercase font-semibold">Logged in as</p>
+                        <p class="text-sm font-bold text-brand-100" id="currentUserName">User</p>
+                    </div>
+
+                    <!-- PUNCH IN BUTTON -->
+                    <button id="headerPunchInBtn" onclick="handlePunchIn()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold px-3 py-2 rounded-xl transition duration-200 flex items-center space-x-1.5 shadow-md">
+                        <i class="fa-solid fa-clock"></i>
+                        <span>Punch In</span>
+                    </button>
+
+                    <!-- PUNCH OUT BUTTON -->
+                    <button id="headerPunchOutBtn" onclick="handlePunchOut()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-bold px-3 py-2 rounded-xl transition duration-200 flex items-center space-x-1.5 shadow-md">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Punch Out</span>
+                    </button>
+
+                    <!-- SEPARATE LOGOUT BUTTON -->
+                    <button onclick="handleLogout()" class="bg-slate-700 hover:bg-slate-800 text-slate-200 hover:text-white text-xs sm:text-sm font-bold px-3 py-2 rounded-xl transition duration-200 flex items-center space-x-1.5 border border-slate-600">
+                        <i class="fa-solid fa-power-off"></i>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- PRINT REPORT HEADER (Only shows when printing) -->
+        <div class="print-only p-6 border-b-2 border-slate-800 mb-4">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">STAFF ATTENDANCE & SHIFT REPORT</h1>
+                    <p class="text-sm text-slate-600 mt-1" id="printReportSubtitle">Staff Member Attendance Details</p>
+                </div>
+                <div class="text-right text-xs text-slate-600">
+                    <p><strong>Generated Date:</strong> <span id="printReportDate"></span></p>
+                    <p><strong>Report Type:</strong> Official Attendance Records</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT BODY -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-6">
+
+            <!-- TODAY'S ACTIVE SESSION STATUS BAR -->
+            <section class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 no-print flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center space-x-4">
+                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
+                        <i class="fa-solid fa-clock-rotate-left text-2xl"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Punch Status</span>
+                        <div class="flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5">
+                            <span class="text-sm sm:text-base font-bold text-slate-800" id="activeInTimeDisplay">In Time: --:--</span>
+                            <span class="text-slate-300">|</span>
+                            <span class="text-sm sm:text-base font-bold text-slate-800" id="activeOutTimeDisplay">Out Time: --:--</span>
+                            <span class="text-slate-300">|</span>
+                            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700" id="activeStatusDisplay">Not Punched In</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button onclick="handlePunchIn()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center space-x-1">
+                        <i class="fa-solid fa-sign-in-alt"></i>
+                        <span>Punch In Now</span>
+                    </button>
+                    <button onclick="handlePunchOut()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center space-x-1">
+                        <i class="fa-solid fa-sign-out-alt"></i>
+                        <span>Punch Out Now</span>
+                    </button>
+                    <button id="applyLeaveBtn" onclick="toggleLeaveModal(true)" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm">
+                        <i class="fa-solid fa-plane-departure"></i>
+                        <span>Apply Leave</span>
+                    </button>
+                    <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Print Sheet (PDF)</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- STATS ANALYTICS BAR (MEAN WORKING HOURS & OVERTIME) -->
+            <section class="grid grid-cols-2 md:grid-cols-4 gap-4 no-print">
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 mb-1">
+                        <span class="text-xs font-bold uppercase tracking-wider">Mean Working Hrs</span>
+                        <i class="fa-solid fa-chart-line text-brand-500"></i>
+                    </div>
+                    <div class="text-2xl font-extrabold text-slate-800" id="statMeanHours">0.0 hrs</div>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Average worked time per shift</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 mb-1">
+                        <span class="text-xs font-bold uppercase tracking-wider">Total Overtime (OT)</span>
+                        <i class="fa-solid fa-business-time text-amber-500"></i>
+                    </div>
+                    <div class="text-2xl font-extrabold text-amber-600" id="statTotalOT">0.0 hrs</div>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Extra hours calculated beyond shift</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 mb-1">
+                        <span class="text-xs font-bold uppercase tracking-wider">Total Net Worked</span>
+                        <i class="fa-solid fa-clock text-emerald-500"></i>
+                    </div>
+                    <div class="text-2xl font-extrabold text-emerald-600" id="statTotalNet">0.0 hrs</div>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Cumulative hours logged</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 mb-1">
+                        <span class="text-xs font-bold uppercase tracking-wider">Leave Days</span>
+                        <i class="fa-solid fa-umbrella-beach text-purple-500"></i>
+                    </div>
+                    <div class="text-2xl font-extrabold text-purple-600" id="statLeaveCount">0 Days</div>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Approved & pending leaves</p>
+                </div>
+            </section>
+
+            <!-- SHIFT SCHEDULE MANAGEMENT BAR (ADMIN ONLY VIEW) -->
+            <section id="adminShiftPanel" class="hidden bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-5 text-white shadow-md no-print">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-700 pb-2">
+                    <h3 class="font-bold text-sm text-brand-100 uppercase tracking-wider flex items-center">
+                        <i class="fa-solid fa-calendar-days text-brand-500 mr-2"></i> Staff Shift Schedule Management (Admin)
+                    </h3>
+                    <span class="text-xs bg-purple-500/20 text-purple-300 px-2.5 py-0.5 rounded-full border border-purple-500/30">Shift Controls</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="shiftScheduleList">
+                    <!-- Dynamic Shifts Per Staff will render here -->
+                </div>
+            </section>
+
+            <!-- ATTENDANCE FILTER & STAFF SELECTION BAR -->
+            <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 no-print">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                        
+                        <!-- Staff Select Filter -->
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Select Staff Sheet</label>
+                            <select id="staffFilter" onchange="renderAttendanceTable()" class="text-xs font-semibold border border-slate-300 rounded-xl px-3 py-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                                <option value="ALL">All Staff Members</option>
+                                <option value="Kuldeep Joshi">Kuldeep Joshi</option>
+                                <option value="Anup Mishra">Anup Mishra</option>
+                                <option value="Jeevan Singh">Jeevan Singh</option>
+                                <option value="Khalid">Khalid</option>
+                            </select>
+                        </div>
+
+                        <!-- Date Filter -->
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Filter Month/Date</label>
+                            <input type="date" id="dateFilter" onchange="renderAttendanceTable()" class="text-xs font-semibold border border-slate-300 rounded-xl px-3 py-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+
+                        <!-- Search -->
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Search Log</label>
+                            <input type="text" id="searchInput" oninput="renderAttendanceTable()" placeholder="Search remarks or status..." class="text-xs border border-slate-300 rounded-xl px-3 py-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+
+                        <button onclick="resetFilters()" class="self-end text-xs text-slate-500 hover:text-slate-800 underline pb-2">
+                            Reset Filters
+                        </button>
+                    </div>
+
+                    <!-- Manual Override Entry Button (Admin) -->
+                    <button id="addManualBtn" onclick="toggleManualModal(true)" class="hidden self-end bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-sm items-center space-x-1.5">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Manual Entry Log</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ATTENDANCE TABLE CARD -->
+            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print-card">
+                
+                <!-- Print Summary Card (Visible in PDF print only) -->
+                <div class="print-only p-4 bg-slate-50 border-b border-slate-300">
+                    <div class="grid grid-cols-5 gap-3 text-xs">
+                        <div><strong>Staff Selected:</strong> <span id="printStaffName">All Staff</span></div>
+                        <div><strong>Total Records:</strong> <span id="printTotalRecords">0</span></div>
+                        <div><strong>Mean Working Hrs:</strong> <span id="printMeanHours">0.0 hrs</span></div>
+                        <div><strong>Total Overtime (OT):</strong> <span id="printTotalOT">0.0 hrs</span></div>
+                        <div><strong>Total Working Hours:</strong> <span id="printTotalHours">0 hrs</span></div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                            <tr>
+                                <th class="py-3.5 px-4">#</th>
+                                <th class="py-3.5 px-4">Date</th>
+                                <th class="py-3.5 px-4">Staff Member</th>
+                                <th class="py-3.5 px-4">Assigned Shift</th>
+                                <th class="py-3.5 px-4">In Time</th>
+                                <th class="py-3.5 px-4">Out Time</th>
+                                <th class="py-3.5 px-4">Net Hrs</th>
+                                <th class="py-3.5 px-4">OT Hrs</th>
+                                <th class="py-3.5 px-4">Status</th>
+                                <th class="py-3.5 px-4">Remarks</th>
+                                <th class="py-3.5 px-4 text-center no-print">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTbody" class="divide-y divide-slate-200 bg-white">
+                            <!-- Dynamic Content Rendered Here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden text-center py-12">
+                    <i class="fa-solid fa-folder-open text-4xl text-slate-300 mb-2"></i>
+                    <p class="text-slate-500 font-medium text-sm">No attendance records found for this criteria.</p>
+                </div>
+            </section>
+
+            <!-- LEAVE APPLICATIONS MANAGEMENT SECTION -->
+            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4 no-print">
+                <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+                    <h3 class="font-extrabold text-base text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-envelope-open-text text-purple-600"></i>
+                        <span>Leave Applications & Requests</span>
+                    </h3>
+                    <button onclick="toggleLeaveModal(true)" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition">
+                        + Apply New Leave
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-xs">
+                        <thead class="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b">
+                            <tr>
+                                <th class="py-2.5 px-3">Staff Member</th>
+                                <th class="py-2.5 px-3">Leave Type</th>
+                                <th class="py-2.5 px-3">From Date</th>
+                                <th class="py-2.5 px-3">To Date</th>
+                                <th class="py-2.5 px-3">Reason</th>
+                                <th class="py-2.5 px-3">Status</th>
+                                <th class="py-2.5 px-3 text-center">Admin Approval</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaveTbody" class="divide-y divide-slate-100">
+                            <!-- Dynamic Leave Requests Rendered Here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <!-- PRINT SIGNATURE FOOTER -->
+        <div class="print-only px-8 pt-16 mt-auto">
+            <div class="flex justify-between items-end text-xs">
+                <div class="text-center w-48">
+                    <div class="border-b border-slate-400 mb-2"></div>
+                    <p class="font-bold">Staff Member Signature</p>
+                </div>
+                <div class="text-center w-48">
+                    <div class="border-b border-slate-400 mb-2"></div>
+                    <p class="font-bold">Manager / Authorized Signatory</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MANUAL ENTRY MODAL (ADMIN ONLY) -->
+    <!-- ... existing modal ... -->
+
+    <!-- LEAVE APPLICATION MODAL -->
+    <div id="leaveModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-700 to-purple-900 text-white p-4 px-6 flex justify-between items-center">
+                <h3 class="font-bold text-base flex items-center"><i class="fa-solid fa-plane-departure mr-2"></i> Apply Leave Request</h3>
+                <button onclick="toggleLeaveModal(false)" class="text-white/80 hover:text-white text-xl">&times;</button>
+            </div>
+            <form onsubmit="handleLeaveSubmit(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Leave Type</label>
+                    <select id="lType" required class="w-full text-xs border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-purple-500 bg-white">
+                        <option value="Casual Leave">Casual Leave (CL)</option>
+                        <option value="Sick Leave">Sick Leave (SL)</option>
+                        <option value="Earned Leave">Earned Leave (EL)</option>
+                        <option value="Unpaid Leave">Unpaid Leave</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">From Date</label>
+                        <input type="date" id="lFromDate" required class="w-full text-xs border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">To Date</label>
+                        <input type="date" id="lToDate" required class="w-full text-xs border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Reason for Leave</label>
+                    <textarea id="lReason" required rows="3" placeholder="Specify reason..." class="w-full text-xs border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="toggleLeaveModal(false)" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-md">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl no-print transition-all duration-300 transform translate-y-20 opacity-0 flex items-center space-x-2 text-xs font-semibold z-50">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="toastIcon"></i>
+        <span id="toastMsg">Operation completed</span>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // CREDENTIALS & USERS DATA
+        const USERS = {
+            'kuldeep': { password: '123', name: 'Kuldeep Joshi', role: 'staff' },
+            'anup': { password: '123', name: 'Anup Mishra', role: 'staff' },
+            'jeevan': { password: '123', name: 'Jeevan Singh', role: 'staff' },
+            'khalid': { password: '123', name: 'Khalid', role: 'staff' },
+            'admin': { password: 'admin', name: 'System Administrator', role: 'admin' }
+        };
+
+        // DEFAULT SHIFT SCHEDULES PER STAFF
+        let shiftSchedules = {
+            "Kuldeep Joshi": { name: "Work Shift", start: "12:00", end: "21:00" },
+            "Anup Mishra": { name: "Work Shift", start: "11:00", end: "20:00" },
+            "Jeevan Singh": { name: "Work Shift", start: "09:00", end: "18:00" },
+            "Khalid": { name: "Work Shift", start: "20:00", end: "08:00" }
+        };
+
+        // GLOBAL STATE
+        let currentUser = null;
+        let logs = [];
+        let leaveRequests = [];
+
+        // HELPER FUNCTIONS
+        function getTodayStr(offsetDays = 0) {
+            const d = new Date();
+            d.setDate(d.getDate() + offsetDays);
+            return d.toISOString().split('T')[0];
+        }
+
+        function getCurrentTimeStr() {
+            const d = new Date();
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+
+        function format12H(time24) {
+            if (!time24) return '--:--';
+            const [h, m] = time24.split(':');
+            let hours = parseInt(h, 10);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            return `${String(hours).padStart(2, '0')}:${m} ${ampm}`;
+        }
+
+        function calculateHours(inTime, outTime) {
+            if (!inTime || !outTime) return '0.0';
+            const [inH, inM] = inTime.split(':').map(Number);
+            const [outH, outM] = outTime.split(':').map(Number);
+            let start = inH * 60 + inM;
+            let end = outH * 60 + outM;
+            if (end < start) end += 24 * 60; // Overnight shift support
+            const diffMinutes = end - start;
+            return (diffMinutes / 60).toFixed(1);
+        }
+
+        function getStatusBadge(status) {
+            switch(status) {
+                case 'Present':
+                    return `<span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-1 rounded-full"><i class="fa-solid fa-circle-check mr-1 text-[10px]"></i>Present</span>`;
+                case 'Late':
+                    return `<span class="bg-amber-100 text-amber-800 text-[11px] font-bold px-2.5 py-1 rounded-full"><i class="fa-solid fa-clock mr-1 text-[10px]"></i>Late</span>`;
+                case 'Half Day':
+                    return `<span class="bg-blue-100 text-blue-800 text-[11px] font-bold px-2.5 py-1 rounded-full"><i class="fa-solid fa-business-time mr-1 text-[10px]"></i>Half Day</span>`;
+                case 'Leave':
+                    return `<span class="bg-purple-100 text-purple-800 text-[11px] font-bold px-2.5 py-1 rounded-full"><i class="fa-solid fa-plane-departure mr-1 text-[10px]"></i>Leave</span>`;
+                case 'Absent':
+                    return `<span class="bg-rose-100 text-rose-800 text-[11px] font-bold px-2.5 py-1 rounded-full"><i class="fa-solid fa-circle-xmark mr-1 text-[10px]"></i>Absent</span>`;
+                default:
+                    return `<span class="bg-slate-100 text-slate-800 text-[11px] font-bold px-2.5 py-1 rounded-full">${status}</span>`;
+            }
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = message;
+            if (isError) {
+                toastIcon.className = "fa-solid fa-circle-exclamation text-rose-400 text-base";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // INITIALIZATION
+        window.addEventListener('DOMContentLoaded', () => {
+            loadStoredData();
+            document.getElementById('printReportDate').innerText = new Date().toLocaleDateString('en-US', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+        });
+
+        function saveLogs() {
+            localStorage.setItem('staff_app_logs_v2', JSON.stringify(logs));
+        }
+
+        function saveShifts() {
+            localStorage.setItem('staff_app_shifts_v2', JSON.stringify(shiftSchedules));
+        }
+
+        function loadStoredData() {
+            const savedLogs = localStorage.getItem('staff_app_logs_v2');
+            if (savedLogs) {
+                try { logs = JSON.parse(savedLogs); } catch(e) { logs = []; }
+            } else {
+                logs = [
+                    { date: getTodayStr(-1), staff: "Kuldeep Joshi", inTime: "09:00", outTime: "19:30", status: "Present", remarks: "Extended overtime shift", shift: "Morning Shift (09:00 - 18:00)" },
+                    { date: getTodayStr(-1), staff: "Anup Mishra", inTime: "09:40", outTime: "18:00", status: "Late", remarks: "Traffic delay", shift: "Morning Shift (09:00 - 18:00)" },
+                    { date: getTodayStr(-1), staff: "Jeevan Singh", inTime: "10:00", outTime: "20:00", status: "Present", remarks: "1hr extra work", shift: "Regular Shift (10:00 - 19:00)" },
+                    { date: getTodayStr(-1), staff: "Khalid", inTime: "", outTime: "", status: "Leave", remarks: "Casual Leave", shift: "General Shift (09:30 - 18:30)" }
+                ];
+                saveLogs();
+            }
+
+            const savedShifts = localStorage.getItem('staff_app_shifts_v2');
+            if (savedShifts) {
+                try { shiftSchedules = JSON.parse(savedShifts); } catch(e) {}
+            }
+
+            const savedLeaves = localStorage.getItem('staff_app_leaves_v1');
+            if (savedLeaves) {
+                try { leaveRequests = JSON.parse(savedLeaves); } catch(e) { leaveRequests = []; }
+            } else {
+                leaveRequests = [
+                    { id: 1, staff: "Khalid", type: "Casual Leave", fromDate: getTodayStr(-1), toDate: getTodayStr(-1), reason: "Personal work", status: "Approved" }
+                ];
+                saveLeaves();
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const uId = document.getElementById('loginUserId').value.trim().toLowerCase();
+            const pwd = document.getElementById('loginPassword').value;
+
+            if (USERS[uId] && USERS[uId].password === pwd) {
+                currentUser = USERS[uId];
+                document.getElementById('loginModal').classList.add('hidden');
+                document.getElementById('appContainer').classList.remove('hidden');
+                document.getElementById('appContainer').classList.add('flex');
+
+                document.getElementById('currentUserName').innerText = currentUser.name;
+
+                if (currentUser.role === 'admin') {
+                    document.getElementById('adminBadge').classList.remove('hidden');
+                    document.getElementById('adminShiftPanel').classList.remove('hidden');
+                    document.getElementById('addManualBtn').classList.remove('hidden');
+                    document.getElementById('currentStaffShiftDisplay').innerText = "Administrator Access Mode";
+                    document.getElementById('staffFilter').value = 'ALL';
+                } else {
+                    document.getElementById('adminBadge').classList.add('hidden');
+                    document.getElementById('adminShiftPanel').classList.add('hidden');
+                    document.getElementById('addManualBtn').classList.add('hidden');
+                    const myShift = shiftSchedules[currentUser.name] || { name: "General Shift", start: "09:00", end: "18:00" };
+                    document.getElementById('currentStaffShiftDisplay').innerText = `Shift: ${myShift.name} (${myShift.start} - ${myShift.end})`;
+                    document.getElementById('staffFilter').value = currentUser.name;
+                }
+
+                updateActiveStatusDisplay();
+                renderAttendanceTable();
+                renderShiftManagementPanel();
+                showToast(`Welcome back, ${currentUser.name}!`);
+            } else {
+                showToast("Invalid User ID or Password", true);
+            }
+        }
+
+        function handleLogout() {
+            currentUser = null;
+            document.getElementById('loginUserId').value = '';
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('appContainer').classList.add('hidden');
+            document.getElementById('appContainer').classList.remove('flex');
+            document.getElementById('loginModal').classList.remove('hidden');
+            showToast("Logged out successfully");
+        }
+
+        function updateActiveStatusDisplay() {
+            if (!currentUser || currentUser.role === 'admin') return;
+
+            const today = getTodayStr();
+            const todayLog = logs.find(l => l.date === today && l.staff === currentUser.name);
+
+            if (todayLog) {
+                document.getElementById('activeInTimeDisplay').innerText = `In Time: ${format12H(todayLog.inTime)}`;
+                document.getElementById('activeOutTimeDisplay').innerText = `Out Time: ${format12H(todayLog.outTime)}`;
+                document.getElementById('activeStatusDisplay').innerText = todayLog.status;
+            } else {
+                document.getElementById('activeInTimeDisplay').innerText = `In Time: --:--`;
+                document.getElementById('activeOutTimeDisplay').innerText = `Out Time: --:--`;
+                document.getElementById('activeStatusDisplay').innerText = `Not Punched In`;
+            }
+        }
+
+        function handlePunchIn() {
+            if (!currentUser || currentUser.role === 'admin') {
+                showToast("Please log in as a staff member to Punch In", true);
+                return;
+            }
+
+            const today = getTodayStr();
+            const now = getCurrentTimeStr();
+            let todayLog = logs.find(l => l.date === today && l.staff === currentUser.name);
+
+            if (todayLog && todayLog.inTime) {
+                showToast(`Already Punched In today at ${format12H(todayLog.inTime)}`, true);
+                return;
+            }
+
+            const myShift = shiftSchedules[currentUser.name] || { name: "General Shift", start: "09:00", end: "18:00" };
+            
+            // Calculate late status (15 min grace period)
+            const [sH, sM] = myShift.start.split(':').map(Number);
+            const [nH, nM] = now.split(':').map(Number);
+            const shiftStartMin = sH * 60 + sM;
+            const nowMin = nH * 60 + nM;
+            
+            let status = "Present";
+            if (nowMin > shiftStartMin + 15) {
+                status = "Late";
+            }
+
+            if (!todayLog) {
+                todayLog = {
+                    date: today,
+                    staff: currentUser.name,
+                    inTime: now,
+                    outTime: "",
+                    status: status,
+                    remarks: status === "Late" ? "Late entry" : "On time",
+                    shift: `${myShift.name} (${myShift.start} - ${myShift.end})`
+                };
+                logs.unshift(todayLog);
+            } else {
+                todayLog.inTime = now;
+                todayLog.status = status;
+            }
+
+            saveLogs();
+            updateActiveStatusDisplay();
+            renderAttendanceTable();
+            showToast(`Punched In at ${format12H(now)}`);
+        }
+
+        function handlePunchOut() {
+            if (!currentUser || currentUser.role === 'admin') {
+                showToast("Please log in as a staff member to Punch Out", true);
+                return;
+            }
+
+            const today = getTodayStr();
+            const now = getCurrentTimeStr();
+            const todayLog = logs.find(l => l.date === today && l.staff === currentUser.name);
+
+            if (!todayLog || !todayLog.inTime) {
+                showToast("You must Punch In before you can Punch Out", true);
+                return;
+            }
+
+            todayLog.outTime = now;
+            saveLogs();
+            updateActiveStatusDisplay();
+            renderAttendanceTable();
+            showToast(`Punched Out at ${format12H(now)}`);
+        }
+
+        function renderShiftManagementPanel() {
+            const container = document.getElementById('shiftScheduleList');
+            if (!container) return;
+            container.innerHTML = '';
+
+            Object.keys(shiftSchedules).forEach(staffName => {
+                const shift = shiftSchedules[staffName];
+                const card = document.createElement('div');
+                card.className = "bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 text-xs";
+                card.innerHTML = `
+                    <p class="font-bold text-slate-200 mb-1">${staffName}</p>
+                    <p class="text-brand-300 font-medium mb-1">${shift.name}</p>
+                    <p class="text-slate-400">${format12H(shift.start)} - ${format12H(shift.end)}</p>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function resetFilters() {
+            document.getElementById('dateFilter').value = '';
+            document.getElementById('searchInput').value = '';
+            if (currentUser && currentUser.role !== 'admin') {
+                document.getElementById('staffFilter').value = currentUser.name;
+            } else {
+                document.getElementById('staffFilter').value = 'ALL';
+            }
+            renderAttendanceTable();
+        }
+
+        function deleteLog(index) {
+            if (confirm("Are you sure you want to delete this record?")) {
+                logs.splice(index, 1);
+                saveLogs();
+                renderAttendanceTable();
+                showToast("Record deleted");
+            }
+        }
+
+        function saveLeaves() {
+            localStorage.setItem('staff_app_leaves_v1', JSON.stringify(leaveRequests));
+        }
+
+        // OVERTIME & WORKING HOURS CALCULATIONS
+        function calculateShiftStandardHours(shiftStr) {
+            if (!shiftStr) return 9.0;
+            const match = shiftStr.match(/\((\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\)/);
+            if (match) {
+                return parseFloat(calculateHours(match[1], match[2]));
+            }
+            return 9.0;
+        }
+
+        function calculateOvertimeHours(inTime, outTime, shiftStr) {
+            if (!inTime || !outTime) return '0.0';
+            const totalWorked = parseFloat(calculateHours(inTime, outTime));
+            const stdHours = calculateShiftStandardHours(shiftStr);
+            const ot = totalWorked - stdHours;
+            return ot > 0 ? ot.toFixed(1) : '0.0';
+        }
+
+        // LEAVE APPLICATION HANDLERS
+        function toggleLeaveModal(show) {
+            document.getElementById('lFromDate').value = getTodayStr(0);
+            document.getElementById('lToDate').value = getTodayStr(0);
+            document.getElementById('leaveModal').classList.toggle('hidden', !show);
+        }
+
+        function handleLeaveSubmit(e) {
+            e.preventDefault();
+            if (!currentUser || currentUser.role === 'admin') {
+                showToast("Please log in as a staff member to apply for leave", true);
+                return;
+            }
+
+            const type = document.getElementById('lType').value;
+            const fromDate = document.getElementById('lFromDate').value;
+            const toDate = document.getElementById('lToDate').value;
+            const reason = document.getElementById('lReason').value;
+
+            const newLeave = {
+                id: Date.now(),
+                staff: currentUser.name,
+                type,
+                fromDate,
+                toDate,
+                reason,
+                status: "Pending"
+            };
+
+            leaveRequests.unshift(newLeave);
+            saveLeaves();
+            renderLeaveTable();
+            toggleLeaveModal(false);
+            showToast("Leave request submitted for admin approval!");
+        }
+
+        function updateLeaveStatus(id, newStatus) {
+            const leave = leaveRequests.find(l => l.id === id);
+            if (leave) {
+                leave.status = newStatus;
+                saveLeaves();
+                
+                if (newStatus === 'Approved') {
+                    const shift = shiftSchedules[leave.staff] || { name: "General Shift", start: "09:00", end: "18:00" };
+                    logs.unshift({
+                        date: leave.fromDate,
+                        staff: leave.staff,
+                        inTime: "",
+                        outTime: "",
+                        status: "Leave",
+                        remarks: `Approved ${leave.type}: ${leave.reason}`,
+                        shift: `${shift.name} (${shift.start} - ${shift.end})`
+                    });
+                    saveLogs();
+                    renderAttendanceTable();
+                }
+
+                renderLeaveTable();
+                showToast(`Leave status updated to ${newStatus}`);
+            }
+        }
+
+        function renderLeaveTable() {
+            const tbody = document.getElementById('leaveTbody');
+            tbody.innerHTML = '';
+
+            const selectedStaff = document.getElementById('staffFilter').value;
+            let filteredLeaves = leaveRequests.filter(l => selectedStaff === 'ALL' || l.staff === selectedStaff);
+
+            filteredLeaves.forEach(l => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition";
+                tr.innerHTML = `
+                    <td class="py-2.5 px-3 font-semibold text-slate-800">${l.staff}</td>
+                    <td class="py-2.5 px-3 font-medium text-purple-700">${l.type}</td>
+                    <td class="py-2.5 px-3">${l.fromDate}</td>
+                    <td class="py-2.5 px-3">${l.toDate}</td>
+                    <td class="py-2.5 px-3 text-slate-500 max-w-xs truncate">${l.reason}</td>
+                    <td class="py-2.5 px-3 font-bold">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] ${
+                            l.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                            l.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                        }">${l.status}</span>
+                    </td>
+                    <td class="py-2.5 px-3 text-center space-x-1">
+                        ${currentUser && currentUser.role === 'admin' && l.status === 'Pending' ? `
+                            <button onclick="updateLeaveStatus(${l.id}, 'Approved')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded text-[10px] font-bold">Approve</button>
+                            <button onclick="updateLeaveStatus(${l.id}, 'Rejected')" class="bg-rose-600 hover:bg-rose-700 text-white px-2 py-0.5 rounded text-[10px] font-bold">Reject</button>
+                        ` : '<span class="text-slate-400">-</span>'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('statLeaveCount').innerText = `${filteredLeaves.filter(l => l.status === 'Approved').length} Days`;
+        }
+
+        // RENDER MAIN ATTENDANCE TABLE WITH OVERTIME & MEAN HOURS CALCULATIONS
+        function renderAttendanceTable() {
+            const tbody = document.getElementById('attendanceTbody');
+            const selectedStaff = document.getElementById('staffFilter').value;
+            const selectedDate = document.getElementById('dateFilter').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+
+            tbody.innerHTML = '';
+
+            let filtered = logs.filter(item => {
+                const matchStaff = selectedStaff === 'ALL' || item.staff === selectedStaff;
+                const matchDate = !selectedDate || item.date === selectedDate;
+                const matchSearch = item.staff.toLowerCase().includes(search) || 
+                                    item.remarks.toLowerCase().includes(search) ||
+                                    item.status.toLowerCase().includes(search);
+                return matchStaff && matchDate && matchSearch;
+            });
+
+            document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+
+            let totalPresents = 0;
+            let totalHoursAccumulated = 0;
+            let totalOTAccumulated = 0;
+            let validDaysCount = 0;
+
+            filtered.forEach((item, index) => {
+                const originalIndex = logs.indexOf(item);
+                const hoursWorked = calculateHours(item.inTime, item.outTime);
+                const otWorked = calculateOvertimeHours(item.inTime, item.outTime, item.shift);
+
+                const numWorked = parseFloat(hoursWorked) || 0;
+                const numOT = parseFloat(otWorked) || 0;
+
+                if (item.status === 'Present' || item.status === 'Late') totalPresents++;
+                if (numWorked > 0) {
+                    totalHoursAccumulated += numWorked;
+                    totalOTAccumulated += numOT;
+                    validDaysCount++;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition text-xs sm:text-sm";
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-xs text-slate-400">${index + 1}</td>
+                    <td class="py-3 px-4 font-bold text-slate-800">${item.date}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-900">${item.staff}</td>
+                    <td class="py-3 px-4 text-xs text-slate-500">${item.shift || 'General Shift'}</td>
+                    <td class="py-3 px-4 font-medium text-emerald-700 bg-emerald-50/50">${format12H(item.inTime)}</td>
+                    <td class="py-3 px-4 font-medium text-rose-700 bg-rose-50/50">${format12H(item.outTime)}</td>
+                    <td class="py-3 px-4 font-mono font-bold text-slate-700">${hoursWorked} hrs</td>
+                    <td class="py-3 px-4 font-mono font-bold ${numOT > 0 ? 'text-amber-600 bg-amber-50/50' : 'text-slate-400'}">${otWorked} hrs</td>
+                    <td class="py-3 px-4">${getStatusBadge(item.status)}</td>
+                    <td class="py-3 px-4 text-slate-600 max-w-xs truncate">${item.remarks}</td>
+                    <td class="py-3 px-4 text-center space-x-1.5 no-print">
+                        ${currentUser && currentUser.role === 'admin' ? `
+                            <button onclick="deleteLog(${originalIndex})" class="text-rose-600 hover:text-rose-800 p-1.5 bg-rose-50 rounded-lg">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        ` : '-'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Calculate Mean / Average Working Hours
+            const meanHours = validDaysCount > 0 ? (totalHoursAccumulated / validDaysCount).toFixed(1) : '0.0';
+
+            // Dashboard Analytics Updates
+            document.getElementById('statMeanHours').innerText = `${meanHours} hrs`;
+            document.getElementById('statTotalOT').innerText = `${totalOTAccumulated.toFixed(1)} hrs`;
+            document.getElementById('statTotalNet').innerText = `${totalHoursAccumulated.toFixed(1)} hrs`;
+
+            // Update PDF Print Sheet Summary Variables
+            document.getElementById('printStaffName').innerText = selectedStaff === 'ALL' ? 'All Staff Members' : selectedStaff;
+            document.getElementById('printTotalRecords').innerText = filtered.length;
+            document.getElementById('printMeanHours').innerText = `${meanHours} hrs`;
+            document.getElementById('printTotalOT').innerText = `${totalOTAccumulated.toFixed(1)} hrs`;
+            document.getElementById('printTotalHours').innerText = `${totalHoursAccumulated.toFixed(1)} hrs`;
+            document.getElementById('printReportSubtitle').innerText = selectedStaff === 'ALL' 
+                ? 'Complete Staff Attendance, Overtime & Leave Report' 
+                : `Individual Staff Report (OT & Leaves): ${selectedStaff}`;
+
+            renderLeaveTable();
+        }
+    </script>
+</body>
+</html>
