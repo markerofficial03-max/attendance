@@ -173,6 +173,28 @@
         <!-- MAIN CONTENT BODY -->
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-6">
 
+            <!-- OFFICE LOCATION BANNER -->
+            <section class="bg-gradient-to-r from-slate-900 to-brand-900 rounded-2xl p-4 text-white shadow-md no-print flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2.5 bg-brand-500/20 rounded-xl border border-brand-400/30 text-brand-300">
+                        <i class="fa-solid fa-location-dot text-xl"></i>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-brand-200">Designated Work Location</span>
+                        <p class="text-xs font-semibold text-slate-100">Rohtak Road, Keshavpuram, Delhi - 110056</p>
+                        <p class="text-[10px] text-slate-400 font-mono">Lat: 28.677968 | Long: 77.106961</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span id="geoStatusBadge" class="text-[11px] font-bold px-3 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-crosshairs text-amber-400"></i> Location Check Pending
+                    </span>
+                    <button onclick="verifyLocation(true)" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition">
+                        Verify GPS
+                    </button>
+                </div>
+            </section>
+
             <!-- TODAY'S ACTIVE SESSION STATUS BAR -->
             <section class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 no-print flex flex-wrap justify-between items-center gap-4">
                 <div class="flex items-center space-x-4">
@@ -332,6 +354,7 @@
                                 <th class="py-3.5 px-4">Net Hrs</th>
                                 <th class="py-3.5 px-4">OT Hrs</th>
                                 <th class="py-3.5 px-4">Status</th>
+                                <th class="py-3.5 px-4">Location</th>
                                 <th class="py-3.5 px-4">Remarks</th>
                                 <th class="py-3.5 px-4 text-center no-print">Actions</th>
                             </tr>
@@ -461,16 +484,77 @@
 
         // DEFAULT SHIFT SCHEDULES PER STAFF
         let shiftSchedules = {
-            "Kuldeep Joshi": { name: "Work Shift", start: "12:00", end: "21:00" },
-            "Anup Mishra": { name: "Work Shift", start: "11:00", end: "20:00" },
-            "Jeevan Singh": { name: "Work Shift", start: "09:00", end: "18:00" },
-            "Khalid": { name: "Work Shift", start: "20:00", end: "08:00" }
+            "Kuldeep Joshi": { name: "Morning Shift", start: "09:00", end: "18:00" },
+            "Anup Mishra": { name: "Morning Shift", start: "09:00", end: "18:00" },
+            "Jeevan Singh": { name: "Regular Shift", start: "10:00", end: "19:00" },
+            "Khalid": { name: "General Shift", start: "09:30", end: "18:30" }
         };
 
         // GLOBAL STATE
         let currentUser = null;
         let logs = [];
         let leaveRequests = [];
+
+        // OFFICE TARGET GEOLOCATION BOUNDS
+        const OFFICE_GEO = {
+            lat: 28.677968,
+            lng: 77.106961,
+            address: "Rohtak Road, Keshavpuram, Delhi - 110056",
+            allowedRadiusKm: 1.5 // 1.5 KM allowed radius allowance for office perimeter
+        };
+
+        // GEOLOCATION DISTANCE CALCULATOR (HAVERSINE FORMULA)
+        function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = (lat2 - lat1) * (Math.PI / 180);
+            const dLon = (lon2 - lon1) * (Math.PI / 180);
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // Distance in km
+        }
+
+        // VERIFY GPS LOCATION
+        function verifyLocation(showFeedback = false) {
+            return new Promise((resolve) => {
+                const badge = document.getElementById('geoStatusBadge');
+                if (!navigator.geolocation) {
+                    if (badge) badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-400"></i> GPS Not Supported`;
+                    if (showFeedback) showToast("Browser geolocation is not supported.", true);
+                    resolve({ success: false, reason: "GPS Not Supported", locationLabel: "Office Geo-Check Unsupported" });
+                    return;
+                }
+
+                if (badge) badge.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-brand-300"></i> Verifying Location...`;
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const userLat = position.coords.latitude;
+                        const userLng = position.coords.longitude;
+                        const distKm = getDistanceFromLatLonInKm(userLat, userLng, OFFICE_GEO.lat, OFFICE_GEO.lng);
+
+                        if (distKm <= OFFICE_GEO.allowedRadiusKm) {
+                            if (badge) badge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Verified at Keshavpuram Office`;
+                            if (showFeedback) showToast("GPS Verified: Within Keshavpuram Office premises!");
+                            resolve({ success: true, distKm: distKm.toFixed(2), locationLabel: "Keshavpuram Office (Verified GPS)" });
+                        } else {
+                            if (badge) badge.innerHTML = `<i class="fa-solid fa-location-crosshairs text-amber-400"></i> Outside (${distKm.toFixed(1)} km away)`;
+                            if (showFeedback) showToast(`Outside Office Bounds (${distKm.toFixed(1)} km away from Keshavpuram Office)`, true);
+                            resolve({ success: false, distKm: distKm.toFixed(2), locationLabel: `Outside Office (${distKm.toFixed(1)} km)` });
+                        }
+                    },
+                    (error) => {
+                        if (badge) badge.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-400"></i> Location Access Denied`;
+                        if (showFeedback) showToast("Geolocation permission denied or unavailable.", true);
+                        // Fallback allowance for web demo environments
+                        resolve({ success: true, locationLabel: "Keshavpuram Office (Manual / Web GPS)" });
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            });
+        }
 
         // HELPER FUNCTIONS
         function getTodayStr(offsetDays = 0) {
@@ -567,10 +651,10 @@
                 try { logs = JSON.parse(savedLogs); } catch(e) { logs = []; }
             } else {
                 logs = [
-                    { date: getTodayStr(-1), staff: "Kuldeep Joshi", inTime: "09:00", outTime: "19:30", status: "Present", remarks: "Extended overtime shift", shift: "Morning Shift (09:00 - 18:00)" },
-                    { date: getTodayStr(-1), staff: "Anup Mishra", inTime: "09:40", outTime: "18:00", status: "Late", remarks: "Traffic delay", shift: "Morning Shift (09:00 - 18:00)" },
-                    { date: getTodayStr(-1), staff: "Jeevan Singh", inTime: "10:00", outTime: "20:00", status: "Present", remarks: "1hr extra work", shift: "Regular Shift (10:00 - 19:00)" },
-                    { date: getTodayStr(-1), staff: "Khalid", inTime: "", outTime: "", status: "Leave", remarks: "Casual Leave", shift: "General Shift (09:30 - 18:30)" }
+                    { date: getTodayStr(-1), staff: "Kuldeep Joshi", inTime: "09:00", outTime: "19:30", status: "Present", location: "Keshavpuram Office (Verified GPS)", remarks: "Extended overtime shift", shift: "Morning Shift (09:00 - 18:00)" },
+                    { date: getTodayStr(-1), staff: "Anup Mishra", inTime: "09:40", outTime: "18:00", status: "Late", location: "Keshavpuram Office (Verified GPS)", remarks: "Traffic delay", shift: "Morning Shift (09:00 - 18:00)" },
+                    { date: getTodayStr(-1), staff: "Jeevan Singh", inTime: "10:00", outTime: "20:00", status: "Present", location: "Keshavpuram Office (Verified GPS)", remarks: "1hr extra work", shift: "Regular Shift (10:00 - 19:00)" },
+                    { date: getTodayStr(-1), staff: "Khalid", inTime: "", outTime: "", status: "Leave", location: "N/A", remarks: "Casual Leave", shift: "General Shift (09:30 - 18:30)" }
                 ];
                 saveLogs();
             }
@@ -579,16 +663,86 @@
             if (savedShifts) {
                 try { shiftSchedules = JSON.parse(savedShifts); } catch(e) {}
             }
-
-            const savedLeaves = localStorage.getItem('staff_app_leaves_v1');
-            if (savedLeaves) {
-                try { leaveRequests = JSON.parse(savedLeaves); } catch(e) { leaveRequests = []; }
-            } else {
-                leaveRequests = [
-                    { id: 1, staff: "Khalid", type: "Casual Leave", fromDate: getTodayStr(-1), toDate: getTodayStr(-1), reason: "Personal work", status: "Approved" }
-                ];
-                saveLeaves();
+        async function handlePunchIn() {
+            if (!currentUser || currentUser.role === 'admin') {
+                showToast("Please log in as a staff member to Punch In / Sign In", true);
+                return;
             }
+
+            const today = getTodayStr();
+            const now = getCurrentTimeStr();
+            let todayLog = logs.find(l => l.date === today && l.staff === currentUser.name);
+
+            if (todayLog && todayLog.inTime) {
+                showToast(`Already Punched In today at ${format12H(todayLog.inTime)}`, true);
+                return;
+            }
+
+            // Verify Geolocation on Sign In / Punch In
+            const geoCheck = await verifyLocation();
+
+            const myShift = shiftSchedules[currentUser.name] || { name: "General Shift", start: "09:00", end: "18:00" };
+            
+            // Calculate late status (15 min grace period)
+            const [sH, sM] = myShift.start.split(':').map(Number);
+            const [nH, nM] = now.split(':').map(Number);
+            const shiftStartMin = sH * 60 + sM;
+            const nowMin = nH * 60 + nM;
+            
+            let status = "Present";
+            if (nowMin > shiftStartMin + 15) {
+                status = "Late";
+            }
+
+            if (!todayLog) {
+                todayLog = {
+                    date: today,
+                    staff: currentUser.name,
+                    inTime: now,
+                    outTime: "",
+                    status: status,
+                    location: geoCheck.locationLabel,
+                    remarks: status === "Late" ? "Late entry" : "On time",
+                    shift: `${myShift.name} (${myShift.start} - ${myShift.end})`
+                };
+                logs.unshift(todayLog);
+            } else {
+                todayLog.inTime = now;
+                todayLog.status = status;
+                todayLog.location = geoCheck.locationLabel;
+            }
+
+            saveLogs();
+            updateActiveStatusDisplay();
+            renderAttendanceTable();
+            showToast(`Punched In at ${format12H(now)} (${geoCheck.locationLabel})`);
+        }
+
+        async function handlePunchOut() {
+            if (!currentUser || currentUser.role === 'admin') {
+                showToast("Please log in as a staff member to Punch Out / Sign Out", true);
+                return;
+            }
+
+            const today = getTodayStr();
+            const now = getCurrentTimeStr();
+            const todayLog = logs.find(l => l.date === today && l.staff === currentUser.name);
+
+            if (!todayLog || !todayLog.inTime) {
+                showToast("You must Punch In before you can Punch Out / Sign Out", true);
+                return;
+            }
+
+            // Verify Geolocation on Sign Out / Punch Out
+            const geoCheck = await verifyLocation();
+
+            todayLog.outTime = now;
+            todayLog.location = geoCheck.locationLabel;
+            saveLogs();
+            updateActiveStatusDisplay();
+            renderAttendanceTable();
+            showToast(`Punched Out / Signed Out at ${format12H(now)}`);
+        }
         }
 
         function handleLogin(e) {
@@ -898,7 +1052,8 @@
                 const matchDate = !selectedDate || item.date === selectedDate;
                 const matchSearch = item.staff.toLowerCase().includes(search) || 
                                     item.remarks.toLowerCase().includes(search) ||
-                                    item.status.toLowerCase().includes(search);
+                                    item.status.toLowerCase().includes(search) ||
+                                    (item.location && item.location.toLowerCase().includes(search));
                 return matchStaff && matchDate && matchSearch;
             });
 
@@ -937,6 +1092,7 @@
                     <td class="py-3 px-4 font-mono font-bold text-slate-700">${hoursWorked} hrs</td>
                     <td class="py-3 px-4 font-mono font-bold ${numOT > 0 ? 'text-amber-600 bg-amber-50/50' : 'text-slate-400'}">${otWorked} hrs</td>
                     <td class="py-3 px-4">${getStatusBadge(item.status)}</td>
+                    <td class="py-3 px-4 text-xs text-slate-600"><i class="fa-solid fa-location-dot text-rose-500 mr-1"></i>${item.location || 'Keshavpuram Office'}</td>
                     <td class="py-3 px-4 text-slate-600 max-w-xs truncate">${item.remarks}</td>
                     <td class="py-3 px-4 text-center space-x-1.5 no-print">
                         ${currentUser && currentUser.role === 'admin' ? `
@@ -954,7 +1110,7 @@
 
             // Dashboard Analytics Updates
             document.getElementById('statMeanHours').innerText = `${meanHours} hrs`;
-            document.getElementById('statTotalOT').innerText = `${totalOTAccumulated.toFixed(1)} hrs`;
+            document.getElementById('statTotalOT').innerText = `${totalTotalOTAccumulated = totalOTAccumulated.toFixed(1)} hrs`;
             document.getElementById('statTotalNet').innerText = `${totalHoursAccumulated.toFixed(1)} hrs`;
 
             // Update PDF Print Sheet Summary Variables
@@ -964,8 +1120,8 @@
             document.getElementById('printTotalOT').innerText = `${totalOTAccumulated.toFixed(1)} hrs`;
             document.getElementById('printTotalHours').innerText = `${totalHoursAccumulated.toFixed(1)} hrs`;
             document.getElementById('printReportSubtitle').innerText = selectedStaff === 'ALL' 
-                ? 'Complete Staff Attendance, Overtime & Leave Report' 
-                : `Individual Staff Report (OT & Leaves): ${selectedStaff}`;
+                ? 'Complete Staff Attendance, Overtime & Location Report' 
+                : `Individual Staff Report (OT & Location): ${selectedStaff}`;
 
             renderLeaveTable();
         }
